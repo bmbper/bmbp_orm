@@ -4,6 +4,6 @@ Cargo.lock
 **/*.rs.bk
 *.sublime-project
 .DS_Store
-.idea
+.idea0
 .vscode
 .gitconfig
