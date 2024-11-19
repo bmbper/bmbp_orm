@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(untaaged)]
 pub enum RdbcDbType {
     Mysql,
     Oracle,
@@ -14,7 +13,7 @@ pub enum RdbcDbType {
 pub struct RdbcDataSource {
     pub db_type: RdbcDbType,
     pub host: String,
-    pub port: String,
+    pub port: u16,
     pub user: String,
     pub password: String,
     pub db_name: String,

@@ -1,9 +1,12 @@
 use crate::ds::RdbcDataSource;
-use crate::pool::{RdbcPool, RdbcPoolInner};
+use crate::error::OrmResp;
+use crate::pool::RdbcPoolInner;
+use crate::RdbcConnInner;
 use bmbp_sql::{
     RdbcDdlWrapper, RdbcDeleteWrapper, RdbcInsertWrapper, RdbcQueryWrapper, RdbcUpdateWrapper,
     RdbcValue,
 };
+use std::clone;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -13,16 +16,19 @@ pub struct RdbcOrm {
 }
 
 impl RdbcOrm {
-    pub fn new(datasource: Arc<RdbcDataSource>) -> Self {
-        RdbcOrm {
-            pool: RdbcPoolInner::new(datasource.clone()),
+    pub fn new(datasource: Arc<RdbcDataSource>) -> OrmResp<Self> {
+        let pool = RdbcPoolInner::new(datasource.clone())?;
+        Ok(RdbcOrm {
+            pool,
             datasource: datasource.clone(),
-        }
+        })
     }
 }
 
 impl RdbcOrm {
-    pub fn get_conn(&self) {}
+    pub fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+        self.pool.get_conn()
+    }
     pub fn get_trans_conn(&self) {}
 }
 impl RdbcOrm {
