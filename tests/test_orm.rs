@@ -5,7 +5,7 @@ use std::sync::Arc;
 #[test]
 pub fn test_orm() {
     let datasource = RdbcDataSource {
-        db_type: RdbcDbType::Mysql,
+        db_type: RdbcDbType::Postgres,
         host: "127.0.0.1".to_string(),
         port: 5432,
         user: "bmbp".to_string(),
@@ -23,12 +23,19 @@ pub fn test_orm() {
                 Ok(mut conn) => match conn.validate() {
                     Ok(_) => println!("连接成功"),
                     Err(e) => {
-                        panic!("{:#?}", e)
+                        println!("连接失败:{:#?}", e);
+                        assert!(false)
                     }
                 },
-                Err(err) => println!("{:?}", err),
+                Err(err) => {
+                    println!("连接失败:{:#?}", err);
+                    assert!(false)
+                }
             }
         }
-        Err(err) => println!("{:?}", err),
+        Err(err) => {
+            println!("连接失败:{:#?}", err);
+            assert!(false)
+        }
     }
 }
