@@ -3,6 +3,7 @@ mod ds;
 mod error;
 mod orm;
 mod pool;
+mod row;
 
 pub use conn::*;
 pub use ds::PoolConfig;
