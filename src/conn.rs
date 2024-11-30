@@ -1,6 +1,5 @@
 use crate::error::{OrmError, OrmErrorKind, OrmResp};
-use bmbp_bean::BmbpResp;
-use bmbp_sql::RdbcQueryWrapper;
+use bmbp_sql::{render_query, DataBase, RdbcQueryWrapper};
 use r2d2::PooledConnection;
 use r2d2_mysql::MySqlConnectionManager;
 use r2d2_oracle::OracleConnectionManager;
@@ -10,22 +9,43 @@ use r2d2_sqlite::SqliteConnectionManager;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-pub trait RdbcConn {
-    fn validate(&mut self) -> OrmResp<()> {
-        Err(OrmError {
-            kind: OrmErrorKind::ConnError,
-            msg: "".to_string(),
-        })
-    }
-    fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<Vec<T>>
-    where
-        T: Serialize + for<'a> Deserialize<'a>;
+pub enum RdbcConn {
+    MySql(RdbcMysqlConn),
+    Oracle(RdbcOracleConn),
+    Postgres(RdbcPostgresConn),
+    Sqlite(RdbcSqliteConn),
 }
+
+impl RdbcConn {
+    pub(crate) fn validate(&mut self) -> OrmResp<()> {
+        match self {
+            RdbcConn::MySql(c) => c.validate(),
+            RdbcConn::Oracle(c) => c.validate(),
+            RdbcConn::Postgres(c) => c.validate(),
+            RdbcConn::Sqlite(c) => c.validate(),
+        }
+    }
+    pub(crate) fn find_list_by_query<T>(&mut self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
+    where
+        T: Serialize + for<'a> Deserialize<'a>,
+    {
+        match self {
+            RdbcConn::MySql(c) => c.find_list_by_query(query),
+            RdbcConn::Oracle(c) => c.find_list_by_query(query),
+            RdbcConn::Postgres(c) => c.find_list_by_query(query),
+            RdbcConn::Sqlite(c) => c.find_list_by_query(query),
+        }
+    }
+}
+
 pub struct RdbcSqliteConn {
     pub conn: PooledConnection<SqliteConnectionManager>,
 }
-impl RdbcConn for RdbcSqliteConn {
-    fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<Vec<T>>
+impl RdbcSqliteConn {
+    pub fn validate(&mut self) -> OrmResp<()> {
+        Ok(())
+    }
+    fn find_list_by_query<T>(&mut self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
@@ -35,8 +55,11 @@ impl RdbcConn for RdbcSqliteConn {
 pub struct RdbcMysqlConn {
     pub conn: PooledConnection<MySqlConnectionManager>,
 }
-impl RdbcConn for RdbcMysqlConn {
-    fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<Vec<T>>
+impl RdbcMysqlConn {
+    pub fn validate(&mut self) -> OrmResp<()> {
+        Ok(())
+    }
+    fn find_list_by_query<T>(&mut self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
@@ -46,8 +69,11 @@ impl RdbcConn for RdbcMysqlConn {
 pub struct RdbcOracleConn {
     pub conn: PooledConnection<OracleConnectionManager>,
 }
-impl RdbcConn for RdbcOracleConn {
-    fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<Vec<T>>
+impl RdbcOracleConn {
+    pub fn validate(&mut self) -> OrmResp<()> {
+        Ok(())
+    }
+    fn find_list_by_query<T>(&mut self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
@@ -57,15 +83,19 @@ impl RdbcConn for RdbcOracleConn {
 pub struct RdbcPostgresConn {
     pub conn: PooledConnection<PostgresConnectionManager<NoTls>>,
 }
-impl RdbcConn for RdbcPostgresConn {
+impl RdbcPostgresConn {
     fn validate(&mut self) -> OrmResp<()> {
         let _ = self.conn.is_valid(Duration::from_secs(100))?;
         Ok(())
     }
-    fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<Vec<T>>
+    fn find_list_by_query<T>(&mut self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
+        let (sql, params) = render_query(query, DataBase::Postgres);
+        println!("===>sql:{}", sql);
+        println!("====>params:{:#?}", params);
+        Ok(vec![])
     }
 }
 
@@ -80,14 +110,17 @@ pub struct RdbcOracleTransConn {}
 impl RdbcTransConn for RdbcOracleTransConn {}
 
 pub struct RdbcConnInner {
-    pub conn: Box<dyn RdbcConn>,
+    pub conn: RdbcConn,
 }
 impl RdbcConnInner {
     pub fn validate(&mut self) -> OrmResp<()> {
         self.conn.validate()
     }
-    fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<Vec<T>> {
-        self.conn.find_list_by_query(query)
+    pub(crate) fn find_list_by_query<T>(&mut self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
+    where
+        T: Serialize + for<'a> Deserialize<'a>,
+    {
+        self.conn.find_list_by_query::<T>(query)
     }
 }
 

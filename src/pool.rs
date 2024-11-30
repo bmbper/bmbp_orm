@@ -1,7 +1,8 @@
 use crate::ds::{RdbcDataSource, RdbcDbType};
 use crate::error::OrmResp;
-use crate::{RdbcConnInner, RdbcMysqlConn, RdbcOracleConn, RdbcPostgresConn, RdbcSqliteConn};
-use bmbp_bean::BmbpResp;
+use crate::{
+    RdbcConn, RdbcConnInner, RdbcMysqlConn, RdbcOracleConn, RdbcPostgresConn, RdbcSqliteConn,
+};
 use bmbp_sql::RdbcQueryWrapper;
 use r2d2::Pool;
 use r2d2_mysql::{mysql, MySqlConnectionManager};
@@ -13,78 +14,104 @@ use r2d2_sqlite::SqliteConnectionManager;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-pub trait RdbcPool: Sync + Send {
-    fn get_conn(&self) -> OrmResp<RdbcConnInner>;
-    fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<Vec<T>>
+pub enum RdbcPool {
+    Sqlite(RdbcSqlitePool),
+    Oracle(RdbcOraclePool),
+    Mysql(RdbcMysqlPool),
+    Postgres(RdbcPostgresPool),
+}
+
+impl RdbcPool {
+    pub(crate) fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+        match self {
+            RdbcPool::Sqlite(p) => p.get_conn(),
+            RdbcPool::Oracle(p) => p.get_conn(),
+            RdbcPool::Mysql(p) => p.get_conn(),
+            RdbcPool::Postgres(p) => p.get_conn(),
+        }
+    }
+    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
-        self.get_conn().find_list_by_query(query)
+        match self {
+            RdbcPool::Sqlite(p) => p.get_conn()?.find_list_by_query(query),
+            RdbcPool::Oracle(p) => p.get_conn()?.find_list_by_query(query),
+            RdbcPool::Mysql(p) => p.get_conn()?.find_list_by_query(query),
+            RdbcPool::Postgres(p) => p.get_conn()?.find_list_by_query(query),
+        }
     }
 }
+
 pub struct RdbcSqlitePool {
     pool: Pool<SqliteConnectionManager>,
 }
-impl RdbcPool for RdbcSqlitePool {
+impl RdbcSqlitePool {
     fn get_conn(&self) -> OrmResp<RdbcConnInner> {
         let conn = RdbcSqliteConn {
             conn: self.pool.get()?,
         };
         Ok(RdbcConnInner {
-            conn: Box::new(conn),
+            conn: RdbcConn::Sqlite(conn),
         })
     }
 }
 pub struct RdbcMysqlPool {
     pool: Pool<MySqlConnectionManager>,
 }
-impl RdbcPool for RdbcMysqlPool {
+impl RdbcMysqlPool {
     fn get_conn(&self) -> OrmResp<RdbcConnInner> {
         let conn = RdbcMysqlConn {
             conn: self.pool.get()?,
         };
         Ok(RdbcConnInner {
-            conn: Box::new(conn),
+            conn: RdbcConn::MySql(conn),
         })
+    }
+    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
+    where
+        T: Serialize + for<'a> Deserialize<'a>,
+    {
+        self.get_conn()?.find_list_by_query::<T>(query)
     }
 }
 pub struct RdbcOraclePool {
     pool: Pool<OracleConnectionManager>,
 }
-impl RdbcPool for RdbcOraclePool {
+impl RdbcOraclePool {
     fn get_conn(&self) -> OrmResp<RdbcConnInner> {
         let conn = RdbcOracleConn {
             conn: self.pool.get()?,
         };
         Ok(RdbcConnInner {
-            conn: Box::new(conn),
+            conn: RdbcConn::Oracle(conn),
         })
     }
 }
 pub struct RdbcPostgresPool {
     pool: Pool<PostgresConnectionManager<NoTls>>,
 }
-impl RdbcPool for RdbcPostgresPool {
+impl RdbcPostgresPool {
     fn get_conn(&self) -> OrmResp<RdbcConnInner> {
         let conn = RdbcPostgresConn {
             conn: self.pool.get()?,
         };
         Ok(RdbcConnInner {
-            conn: Box::new(conn),
+            conn: RdbcConn::Postgres(conn),
         })
     }
 }
 
 pub struct RdbcPoolInner {
     datasource: Arc<RdbcDataSource>,
-    inner: Box<dyn RdbcPool>,
+    inner: RdbcPool,
 }
 
 impl RdbcPoolInner {
     pub fn get_conn(&self) -> OrmResp<RdbcConnInner> {
         self.inner.get_conn()
     }
-    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<Vec<T>>
+    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
@@ -108,7 +135,7 @@ fn build_sqlite_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner>
     let poo_rs = Pool::new(manager)?;
     Ok(RdbcPoolInner {
         datasource: data_source,
-        inner: Box::new(RdbcSqlitePool { pool: poo_rs }),
+        inner: RdbcPool::Sqlite(RdbcSqlitePool { pool: poo_rs }),
     })
 }
 
@@ -125,7 +152,7 @@ fn build_postgres_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInne
     let pool = Pool::new(manage)?;
     Ok(RdbcPoolInner {
         datasource: data_source,
-        inner: Box::new(RdbcPostgresPool { pool }),
+        inner: RdbcPool::Postgres(RdbcPostgresPool { pool }),
     })
 }
 
@@ -138,7 +165,7 @@ fn build_oracle_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner>
     let pool = Pool::new(manager)?;
     Ok(RdbcPoolInner {
         datasource: data_source,
-        inner: Box::new(RdbcOraclePool { pool }),
+        inner: RdbcPool::Oracle(RdbcOraclePool { pool }),
     })
 }
 
@@ -153,7 +180,7 @@ fn build_mysql_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> 
     let pool = Pool::new(manager)?;
     Ok(RdbcPoolInner {
         datasource: data_source,
-        inner: Box::new(RdbcMysqlPool { pool }),
+        inner: RdbcPool::Mysql(RdbcMysqlPool { pool }),
     })
 }
 

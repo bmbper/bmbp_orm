@@ -2,7 +2,6 @@ use crate::ds::RdbcDataSource;
 use crate::error::OrmResp;
 use crate::pool::RdbcPoolInner;
 use crate::RdbcConnInner;
-use bmbp_bean::BmbpResp;
 use bmbp_sql::{RdbcDdlWrapper, RdbcDeleteWrapper, RdbcQueryWrapper, RdbcValue};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -31,7 +30,7 @@ impl RdbcOrm {
 }
 impl RdbcOrm {
     pub fn find_page_by_query(&self, query: &RdbcQueryWrapper, page_num: usize, page_size: usize) {}
-    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<Vec<T>>
+    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {

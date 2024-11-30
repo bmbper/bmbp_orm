@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 bmbp_sql = { workspace = true }
-bmbp_bean = { workspace = true }
 r2d2 = "0.8.10"
 r2d2_redis = "0.14.0"
 r2d2_postgres = "0.18.1"
