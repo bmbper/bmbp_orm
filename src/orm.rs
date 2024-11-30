@@ -1,13 +1,9 @@
 use crate::ds::RdbcDataSource;
 use crate::error::OrmResp;
 use crate::pool::RdbcPoolInner;
-use crate::row::RdbcRow;
 use crate::RdbcConnInner;
 use bmbp_bean::BmbpResp;
-use bmbp_sql::{
-    RdbcDdlWrapper, RdbcDeleteWrapper, RdbcInsertWrapper, RdbcQueryWrapper, RdbcUpdateWrapper,
-    RdbcValue,
-};
+use bmbp_sql::{RdbcDdlWrapper, RdbcDeleteWrapper, RdbcQueryWrapper, RdbcValue};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -35,11 +31,11 @@ impl RdbcOrm {
 }
 impl RdbcOrm {
     pub fn find_page_by_query(&self, query: &RdbcQueryWrapper, page_num: usize, page_size: usize) {}
-    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<T>
+    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<Vec<T>>
     where
-        T: Serialize + Deserialize,
+        T: Serialize + for<'a> Deserialize<'a>,
     {
-        Ok(vec![])
+        self.pool.find_list_by_query(query)
     }
     pub fn execute_delete_by_wrapper(&self, delete: &RdbcDeleteWrapper) {}
     pub fn execute_ddl_by_wrapper(&self, ddl: &RdbcDdlWrapper) {}

@@ -1,8 +1,8 @@
 use crate::ds::{RdbcDataSource, RdbcDbType};
 use crate::error::OrmResp;
-use crate::{
-    RdbcConn, RdbcConnInner, RdbcMysqlConn, RdbcOracleConn, RdbcPostgresConn, RdbcSqliteConn,
-};
+use crate::{RdbcConnInner, RdbcMysqlConn, RdbcOracleConn, RdbcPostgresConn, RdbcSqliteConn};
+use bmbp_bean::BmbpResp;
+use bmbp_sql::RdbcQueryWrapper;
 use r2d2::Pool;
 use r2d2_mysql::{mysql, MySqlConnectionManager};
 use r2d2_oracle::OracleConnectionManager;
@@ -10,10 +10,17 @@ use r2d2_postgres::postgres::NoTls;
 use r2d2_postgres::PostgresConnectionManager;
 use r2d2_redis::redis::Commands;
 use r2d2_sqlite::SqliteConnectionManager;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-pub trait RdbcPool {
+pub trait RdbcPool: Sync + Send {
     fn get_conn(&self) -> OrmResp<RdbcConnInner>;
+    fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<Vec<T>>
+    where
+        T: Serialize + for<'a> Deserialize<'a>,
+    {
+        self.get_conn().find_list_by_query(query)
+    }
 }
 pub struct RdbcSqlitePool {
     pool: Pool<SqliteConnectionManager>,
@@ -74,8 +81,14 @@ pub struct RdbcPoolInner {
 }
 
 impl RdbcPoolInner {
-    pub(crate) fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+    pub fn get_conn(&self) -> OrmResp<RdbcConnInner> {
         self.inner.get_conn()
+    }
+    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> BmbpResp<Vec<T>>
+    where
+        T: Serialize + for<'a> Deserialize<'a>,
+    {
+        self.inner.find_list_by_query(query)
     }
 }
 
