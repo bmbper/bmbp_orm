@@ -1,18 +1,19 @@
+use crate::adapter::MySqlConnectionManager;
 use crate::ds::{RdbcDataSource, RdbcDbType};
-use crate::error::OrmResp;
+use crate::error::{OrmError, OrmErrorKind, OrmResp};
 use crate::{
     RdbcConn, RdbcConnInner, RdbcMysqlConn, RdbcOracleConn, RdbcPostgresConn, RdbcSqliteConn,
 };
+use bb8::Pool;
+use bb8_oracle::OracleConnectionManager;
+use bb8_postgres::PostgresConnectionManager;
+use bb8_sqlite::RusqliteConnectionManager;
 use bmbp_sql::RdbcQueryWrapper;
-use r2d2::Pool;
-use r2d2_mysql::{mysql, MySqlConnectionManager};
-use r2d2_oracle::OracleConnectionManager;
-use r2d2_postgres::postgres::NoTls;
-use r2d2_postgres::PostgresConnectionManager;
-use r2d2_redis::redis::Commands;
-use r2d2_sqlite::SqliteConnectionManager;
+use mysql_async::Opts;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use std::sync::Arc;
+use tokio_postgres::{Config, Error, NoTls};
 
 pub enum RdbcPool {
     Sqlite(RdbcSqlitePool),
@@ -22,83 +23,113 @@ pub enum RdbcPool {
 }
 
 impl RdbcPool {
-    pub(crate) fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+    pub async fn get_conn(&self) -> OrmResp<RdbcConnInner> {
         match self {
-            RdbcPool::Sqlite(p) => p.get_conn(),
-            RdbcPool::Oracle(p) => p.get_conn(),
-            RdbcPool::Mysql(p) => p.get_conn(),
-            RdbcPool::Postgres(p) => p.get_conn(),
+            RdbcPool::Sqlite(p) => p.get_conn().await,
+            RdbcPool::Oracle(p) => p.get_conn().await,
+            RdbcPool::Mysql(p) => p.get_conn().await,
+            RdbcPool::Postgres(p) => p.get_conn().await,
         }
     }
-    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
+    pub async fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
         match self {
-            RdbcPool::Sqlite(p) => p.get_conn()?.find_list_by_query(query),
-            RdbcPool::Oracle(p) => p.get_conn()?.find_list_by_query(query),
-            RdbcPool::Mysql(p) => p.get_conn()?.find_list_by_query(query),
-            RdbcPool::Postgres(p) => p.get_conn()?.find_list_by_query(query),
+            RdbcPool::Sqlite(p) => p.get_conn().await?.find_list_by_query(query).await,
+            RdbcPool::Oracle(p) => p.get_conn().await?.find_list_by_query(query).await,
+            RdbcPool::Mysql(p) => p.get_conn().await?.find_list_by_query(query).await,
+            RdbcPool::Postgres(p) => p.get_conn().await?.find_list_by_query(query).await,
         }
     }
 }
 
 pub struct RdbcSqlitePool {
-    pool: Pool<SqliteConnectionManager>,
+    pool: Pool<RusqliteConnectionManager>,
 }
 impl RdbcSqlitePool {
-    fn get_conn(&self) -> OrmResp<RdbcConnInner> {
-        let conn = RdbcSqliteConn {
-            conn: self.pool.get()?,
-        };
-        Ok(RdbcConnInner {
-            conn: RdbcConn::Sqlite(conn),
-        })
+    async fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+        let conn_rs = self.pool.get().await;
+        match conn_rs {
+            Ok(conn) => {
+                let conn = RdbcSqliteConn { conn };
+                Ok(RdbcConnInner {
+                    conn: RdbcConn::Sqlite(conn),
+                })
+            }
+            Err(err) => Err(OrmError {
+                kind: OrmErrorKind::PoolError,
+                msg: err.to_string(),
+            }),
+        }
     }
 }
 pub struct RdbcMysqlPool {
     pool: Pool<MySqlConnectionManager>,
 }
 impl RdbcMysqlPool {
-    fn get_conn(&self) -> OrmResp<RdbcConnInner> {
-        let conn = RdbcMysqlConn {
-            conn: self.pool.get()?,
-        };
-        Ok(RdbcConnInner {
-            conn: RdbcConn::MySql(conn),
-        })
+    async fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+        let conn_rs = self.pool.get().await;
+        match conn_rs {
+            Ok(conn) => {
+                let mysql_conn = RdbcMysqlConn { conn };
+                Ok(RdbcConnInner {
+                    conn: RdbcConn::MySql(mysql_conn),
+                })
+            }
+            Err(err) => Err(OrmError {
+                kind: OrmErrorKind::PoolError,
+                msg: err.to_string(),
+            }),
+        }
     }
-    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
+
+    pub async fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
-        self.get_conn()?.find_list_by_query::<T>(query)
+        self.get_conn().await?.find_list_by_query::<T>(query).await
     }
 }
 pub struct RdbcOraclePool {
     pool: Pool<OracleConnectionManager>,
 }
+
 impl RdbcOraclePool {
-    fn get_conn(&self) -> OrmResp<RdbcConnInner> {
-        let conn = RdbcOracleConn {
-            conn: self.pool.get()?,
-        };
-        Ok(RdbcConnInner {
-            conn: RdbcConn::Oracle(conn),
-        })
+    async fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+        let conn_rs = self.pool.get().await;
+        match conn_rs {
+            Ok(conn) => {
+                let conn = RdbcOracleConn { conn };
+                Ok(RdbcConnInner {
+                    conn: RdbcConn::Oracle(conn),
+                })
+            }
+            Err(err) => Err(OrmError {
+                kind: OrmErrorKind::PoolError,
+                msg: err.to_string(),
+            }),
+        }
     }
 }
 pub struct RdbcPostgresPool {
     pool: Pool<PostgresConnectionManager<NoTls>>,
 }
 impl RdbcPostgresPool {
-    fn get_conn(&self) -> OrmResp<RdbcConnInner> {
-        let conn = RdbcPostgresConn {
-            conn: self.pool.get()?,
-        };
-        Ok(RdbcConnInner {
-            conn: RdbcConn::Postgres(conn),
-        })
+    async fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+        let conn_rs = self.pool.get().await;
+        match conn_rs {
+            Ok(conn) => {
+                let conn = RdbcPostgresConn { conn };
+                Ok(RdbcConnInner {
+                    conn: RdbcConn::Postgres(conn),
+                })
+            }
+            Err(err) => Err(OrmError {
+                kind: OrmErrorKind::PoolError,
+                msg: err.to_string(),
+            }),
+        }
     }
 }
 
@@ -108,38 +139,47 @@ pub struct RdbcPoolInner {
 }
 
 impl RdbcPoolInner {
-    pub fn get_conn(&self) -> OrmResp<RdbcConnInner> {
-        self.inner.get_conn()
+    pub async fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+        self.inner.get_conn().await
     }
-    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
+    pub async fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
-        self.inner.find_list_by_query(query)
+        self.inner.find_list_by_query(query).await
     }
 }
 
 impl RdbcPoolInner {
-    pub(crate) fn new(datasource: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> {
+    pub(crate) async fn new(datasource: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> {
         match datasource.db_type {
-            RdbcDbType::Mysql => build_mysql_pool(datasource.clone()),
-            RdbcDbType::Oracle => build_oracle_pool(datasource.clone()),
-            RdbcDbType::Postgres => build_postgres_pool(datasource.clone()),
-            RdbcDbType::Sqlite => build_sqlite_pool(datasource.clone()),
+            RdbcDbType::Mysql => build_mysql_pool(datasource.clone()).await,
+            RdbcDbType::Oracle => build_oracle_pool(datasource.clone()).await,
+            RdbcDbType::Postgres => build_postgres_pool(datasource.clone()).await,
+            RdbcDbType::Sqlite => build_sqlite_pool(datasource.clone()).await,
         }
     }
 }
 
-fn build_sqlite_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> {
-    let manager = SqliteConnectionManager::file("bmbp_msg.db");
-    let poo_rs = Pool::new(manager)?;
-    Ok(RdbcPoolInner {
-        datasource: data_source,
-        inner: RdbcPool::Sqlite(RdbcSqlitePool { pool: poo_rs }),
-    })
+async fn build_sqlite_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> {
+    let manage = RusqliteConnectionManager::new("bmbp_msg.db");
+    let pool_rs = Pool::builder()
+        .max_size(data_source.pool_config.max_size.clone() as u32)
+        .build(manage)
+        .await;
+    match pool_rs {
+        Ok(pool) => Ok(RdbcPoolInner {
+            datasource: data_source,
+            inner: RdbcPool::Sqlite(RdbcSqlitePool { pool }),
+        }),
+        Err(err) => Err(OrmError {
+            kind: OrmErrorKind::ConnError,
+            msg: err.to_string(),
+        }),
+    }
 }
 
-fn build_postgres_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> {
+async fn build_postgres_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> {
     let conn_str = format!(
         "host={} port={} user={} password={} dbname={}",
         data_source.host,
@@ -148,40 +188,76 @@ fn build_postgres_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInne
         data_source.password,
         data_source.db_name
     );
-    let manage = PostgresConnectionManager::new(conn_str.as_str().parse().unwrap(), NoTls);
-    let pool = Pool::new(manage)?;
-    Ok(RdbcPoolInner {
-        datasource: data_source,
-        inner: RdbcPool::Postgres(RdbcPostgresPool { pool }),
-    })
+
+    match Config::from_str(conn_str.as_str()) {
+        Ok(cf) => {
+            let manage = PostgresConnectionManager::new(cf, NoTls);
+            let pool_rs = Pool::builder()
+                .max_size(data_source.pool_config.max_size.clone() as u32)
+                .build(manage)
+                .await;
+            match pool_rs {
+                Ok(pool) => Ok(RdbcPoolInner {
+                    datasource: data_source,
+                    inner: RdbcPool::Postgres(RdbcPostgresPool { pool }),
+                }),
+                Err(err) => Err(OrmError {
+                    kind: OrmErrorKind::ConnError,
+                    msg: err.to_string(),
+                }),
+            }
+        }
+        Err(e) => Err(OrmError {
+            kind: OrmErrorKind::PoolError,
+            msg: e.to_string(),
+        }),
+    }
 }
 
-fn build_oracle_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> {
+async fn build_oracle_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> {
     let manager = OracleConnectionManager::new(
         data_source.user.as_str(),
         data_source.password.as_str(),
         data_source.host.as_str(),
     );
-    let pool = Pool::new(manager)?;
-    Ok(RdbcPoolInner {
-        datasource: data_source,
-        inner: RdbcPool::Oracle(RdbcOraclePool { pool }),
-    })
+    let pool_rs = Pool::builder()
+        .max_size(data_source.pool_config.max_size.clone() as u32)
+        .build(manager)
+        .await;
+    match pool_rs {
+        Ok(pool) => Ok(RdbcPoolInner {
+            datasource: data_source,
+            inner: RdbcPool::Oracle(RdbcOraclePool { pool }),
+        }),
+        Err(err) => Err(OrmError {
+            kind: OrmErrorKind::ConnError,
+            msg: err.to_string(),
+        }),
+    }
 }
 
-fn build_mysql_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> {
-    let opts = mysql::OptsBuilder::new()
-        .ip_or_hostname(Some(data_source.host.clone()))
+async fn build_mysql_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> {
+    let opts = mysql_async::OptsBuilder::default()
+        .ip_or_hostname(data_source.host.clone())
         .db_name(Some(data_source.db_name.clone()))
         .user(Some(data_source.user.clone()))
         .pass(Some(data_source.password.clone()))
         .tcp_port(data_source.port as u16);
-    let manager = r2d2_mysql::MySqlConnectionManager::new(opts);
-    let pool = Pool::new(manager)?;
-    Ok(RdbcPoolInner {
-        datasource: data_source,
-        inner: RdbcPool::Mysql(RdbcMysqlPool { pool }),
-    })
+    let manager = MySqlConnectionManager::new(Opts::from(opts));
+    let pool_rs = Pool::builder()
+        .max_size(data_source.pool_config.max_size.clone() as u32)
+        .build(manager)
+        .await;
+    match pool_rs {
+        Ok(pool) => Ok(RdbcPoolInner {
+            datasource: data_source,
+            inner: RdbcPool::Mysql(RdbcMysqlPool { pool }),
+        }),
+        Err(err) => Err(OrmError {
+            kind: OrmErrorKind::ConnError,
+            msg: err.to_string(),
+        }),
+    }
 }
 
 impl RdbcPoolInner {}

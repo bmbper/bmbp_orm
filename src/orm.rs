@@ -13,8 +13,8 @@ pub struct RdbcOrm {
 }
 
 impl RdbcOrm {
-    pub fn new(datasource: Arc<RdbcDataSource>) -> OrmResp<Self> {
-        let pool = RdbcPoolInner::new(datasource.clone())?;
+    pub async fn new(datasource: Arc<RdbcDataSource>) -> OrmResp<Self> {
+        let pool = RdbcPoolInner::new(datasource.clone()).await?;
         Ok(RdbcOrm {
             pool,
             datasource: datasource.clone(),
@@ -23,18 +23,18 @@ impl RdbcOrm {
 }
 
 impl RdbcOrm {
-    pub fn get_conn(&self) -> OrmResp<RdbcConnInner> {
-        self.pool.get_conn()
+    pub async fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+        self.pool.get_conn().await
     }
-    pub fn get_trans_conn(&self) {}
+    pub async fn get_trans_conn(&self) {}
 }
 impl RdbcOrm {
     pub fn find_page_by_query(&self, query: &RdbcQueryWrapper, page_num: usize, page_size: usize) {}
-    pub fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
+    pub async fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
-        self.pool.find_list_by_query(query)
+        self.pool.find_list_by_query(query).await
     }
     pub fn execute_delete_by_wrapper(&self, delete: &RdbcDeleteWrapper) {}
     pub fn execute_ddl_by_wrapper(&self, ddl: &RdbcDdlWrapper) {}
