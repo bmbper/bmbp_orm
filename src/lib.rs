@@ -6,12 +6,25 @@ mod orm;
 mod pool;
 mod row;
 
+use crate::error::{OrmError, OrmErrorKind, OrmResp};
 pub use conn::*;
 pub use ds::PoolConfig;
 pub use ds::RdbcDataSource;
 pub use ds::RdbcDbType;
-use once_cell::sync::OnceCell;
 pub use orm::RdbcOrm;
 pub use pool::RdbcPool;
-use tokio::sync::RwLock;
-pub static BMBP_ORM: OnceCell<RwLock<RdbcOrm>> = OnceCell::new();
+use std::sync::Arc;
+use tokio::sync::{OnceCell, RwLock};
+
+pub static BMBP_ORM: OnceCell<RwLock<RdbcOrm>> = OnceCell::const_new();
+
+pub async fn init_bmbp_orm(ds: RdbcDataSource) -> OrmResp<()> {
+    let orm = RdbcOrm::new(Arc::new(ds)).await?;
+    match BMBP_ORM.set(RwLock::new(orm)) {
+        Ok(v) => Ok(()),
+        Err(err) => Err(OrmError {
+            kind: OrmErrorKind::PoolError,
+            msg: err.to_string(),
+        }),
+    }
+}
