@@ -4,9 +4,8 @@ use bb8::PooledConnection;
 use bb8_oracle::OracleConnectionManager;
 use bb8_postgres::PostgresConnectionManager;
 use bb8_sqlite::RusqliteConnectionManager;
-use bmbp_rdbc_type::RdbcValue;
+use bmbp_rdbc_type::RdbcOrmRow;
 use bmbp_sql::{render_query, DataBase, RdbcQueryWrapper};
-use serde::{Deserialize, Serialize};
 use tokio_postgres::types::ToSql;
 use tokio_postgres::NoTls;
 
@@ -26,13 +25,10 @@ impl<'a> RdbcConn<'a> {
             RdbcConn::Sqlite(c) => c.validate().await,
         }
     }
-    pub(crate) async fn find_list_by_query<T>(
+    pub(crate) async fn find_list_by_query(
         &mut self,
         query: &RdbcQueryWrapper,
-    ) -> OrmResp<Vec<T>>
-    where
-        T: Serialize + for<'t> Deserialize<'t>,
-    {
+    ) -> OrmResp<Vec<RdbcOrmRow>> {
         match self {
             RdbcConn::MySql(c) => c.find_list_by_query(query).await,
             RdbcConn::Oracle(c) => c.find_list_by_query(query).await,
@@ -49,10 +45,10 @@ impl<'a> RdbcSqliteConn<'a> {
     pub async fn validate(&mut self) -> OrmResp<()> {
         Ok(())
     }
-    pub async fn find_list_by_query<T>(&mut self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
-    where
-        T: Serialize + for<'t> Deserialize<'t>,
-    {
+    pub async fn find_list_by_query(
+        &mut self,
+        query: &RdbcQueryWrapper,
+    ) -> OrmResp<Vec<RdbcOrmRow>> {
         Ok(vec![])
     }
 }
@@ -63,10 +59,10 @@ impl<'a> RdbcMysqlConn<'a> {
     pub async fn validate(&mut self) -> OrmResp<()> {
         Ok(())
     }
-    async fn find_list_by_query<T>(&mut self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
-    where
-        T: Serialize + for<'t> Deserialize<'t>,
-    {
+    pub async fn find_list_by_query(
+        &mut self,
+        query: &RdbcQueryWrapper,
+    ) -> OrmResp<Vec<RdbcOrmRow>> {
         Ok(vec![])
     }
 }
@@ -77,10 +73,10 @@ impl<'a> RdbcOracleConn<'a> {
     pub async fn validate(&mut self) -> OrmResp<()> {
         Ok(())
     }
-    async fn find_list_by_query<T>(&mut self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
-    where
-        T: Serialize + for<'t> Deserialize<'t>,
-    {
+    pub async fn find_list_by_query(
+        &mut self,
+        query: &RdbcQueryWrapper,
+    ) -> OrmResp<Vec<RdbcOrmRow>> {
         Ok(vec![])
     }
 }
@@ -91,72 +87,27 @@ impl<'a> RdbcPostgresConn<'a> {
     async fn validate(&mut self) -> OrmResp<()> {
         Ok(())
     }
-    async fn find_list_by_query<T>(&mut self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
-    where
-        T: Serialize + for<'t> Deserialize<'t>,
-    {
+    async fn find_list_by_query(&mut self, query: &RdbcQueryWrapper) -> OrmResp<Vec<RdbcOrmRow>> {
         let (sql, params) = render_query(query, DataBase::Postgres);
-        let pg_box_params = Self::convert_postgres_param(params);
-        let params_ref: Vec<&(dyn ToSql + Sync)> = pg_box_params
+        let pg_prams = params
             .iter()
-            .map(|p| p.as_ref() as &(dyn ToSql + Sync))
-            .collect();
-        let rs = self.conn.query(sql.as_str(), params_ref.as_slice()).await;
+            .map(|v| v as &(dyn ToSql + Sync))
+            .collect::<Vec<_>>();
+        let rs = self.conn.query(sql.as_str(), &pg_prams).await;
         match rs {
             Ok(rows) => {
+                let mut list = Vec::new();
                 for row in rows {
-                    println!("==>{:#?}", row);
+                    let orm_row = RdbcOrmRow::from(row);
+                    list.push(orm_row);
                 }
-                Ok(vec![])
+                Ok(list)
             }
-            Err(e) => {
-                println!("==>{}", e.to_string());
-                Err(OrmError {
-                    kind: OrmErrorKind::SqlError,
-                    msg: e.to_string(),
-                })
-            }
+            Err(e) => Err(OrmError {
+                kind: OrmErrorKind::SqlError,
+                msg: e.to_string(),
+            }),
         }
-    }
-    pub fn convert_postgres_param(params: Vec<RdbcValue>) -> Vec<Box<(dyn ToSql + Sync + Send)>> {
-        let mut params_v = vec![];
-        for item in params {
-            let p_v: Box<dyn ToSql + Sync + Send> = match item {
-                RdbcValue::Char(c) => Box::new(c.to_string()),
-                RdbcValue::Varchar(s) => Box::new(s),
-                RdbcValue::Text(s) => Box::new(s),
-                RdbcValue::LongText(s) => Box::new(s),
-                RdbcValue::SmallInt(i) => Box::new(i),
-                RdbcValue::Int(i) => Box::new(i),
-                RdbcValue::BigInt(i) => Box::new(i),
-                RdbcValue::Double(f) => Box::new(f.clone() as f64), // PostgreSQL uses f64 for real/float8
-                RdbcValue::BigDouble(f) => Box::new(f),
-                RdbcValue::Date(d) => Box::new(d),
-                RdbcValue::DateTime(dt) => Box::new(dt),
-                RdbcValue::Time(t) => Box::new(t),
-                RdbcValue::TimeStamp(ts) => Box::new(ts.clone() as i64), // PostgreSQL uses bigint for timestamps
-                RdbcValue::Bytes(b) => Box::new(b),
-                RdbcValue::Boolean(b) => Box::new(b),
-                RdbcValue::Array(arr) => {
-                    let mut a_v = vec![];
-                    for v in arr {
-                        a_v.push(v.to_string());
-                    }
-                    Box::new(a_v)
-                }
-                RdbcValue::Object(obj) => match serde_json::to_string(&obj) {
-                    Ok(v) => Box::new(v),
-                    Err(e) => {
-                        println!("==>{}", e.to_string());
-                        Box::new("")
-                    }
-                },
-                RdbcValue::Null => Box::new(Option::<i32>::None),
-            };
-            params_v.push(p_v);
-        }
-
-        params_v
     }
 }
 
@@ -173,18 +124,15 @@ impl RdbcTransConn for RdbcOracleTransConn {}
 pub struct RdbcConnInner<'a> {
     pub conn: RdbcConn<'a>,
 }
-impl RdbcConnInner<'_> {
+impl<'a> RdbcConnInner<'a> {
     async fn validate(&mut self) -> OrmResp<()> {
         self.conn.validate().await
     }
-    pub(crate) async fn find_list_by_query<T>(
+    pub(crate) async fn find_list_by_query(
         &mut self,
         query: &RdbcQueryWrapper,
-    ) -> OrmResp<Vec<T>>
-    where
-        T: Serialize + for<'a> Deserialize<'a>,
-    {
-        self.conn.find_list_by_query::<T>(query).await
+    ) -> OrmResp<Vec<RdbcOrmRow>> {
+        self.conn.find_list_by_query(query).await
     }
 }
 

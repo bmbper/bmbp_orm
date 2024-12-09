@@ -8,12 +8,12 @@ use bb8::Pool;
 use bb8_oracle::OracleConnectionManager;
 use bb8_postgres::PostgresConnectionManager;
 use bb8_sqlite::RusqliteConnectionManager;
+use bmbp_rdbc_type::RdbcOrmRow;
 use bmbp_sql::RdbcQueryWrapper;
 use mysql_async::Opts;
-use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio_postgres::{Config, Error, NoTls};
+use tokio_postgres::{Config, NoTls};
 
 pub enum RdbcPool {
     Sqlite(RdbcSqlitePool),
@@ -31,10 +31,7 @@ impl RdbcPool {
             RdbcPool::Postgres(p) => p.get_conn().await,
         }
     }
-    pub async fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
-    where
-        T: Serialize + for<'a> Deserialize<'a>,
-    {
+    pub async fn find_list_by_query(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<RdbcOrmRow>> {
         match self {
             RdbcPool::Sqlite(p) => p.get_conn().await?.find_list_by_query(query).await,
             RdbcPool::Oracle(p) => p.get_conn().await?.find_list_by_query(query).await,
@@ -84,11 +81,8 @@ impl RdbcMysqlPool {
         }
     }
 
-    pub async fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
-    where
-        T: Serialize + for<'a> Deserialize<'a>,
-    {
-        self.get_conn().await?.find_list_by_query::<T>(query).await
+    pub async fn find_list_by_query(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<RdbcOrmRow>> {
+        self.get_conn().await?.find_list_by_query(query).await
     }
 }
 pub struct RdbcOraclePool {
@@ -142,11 +136,8 @@ impl RdbcPoolInner {
     pub async fn get_conn(&self) -> OrmResp<RdbcConnInner> {
         self.inner.get_conn().await
     }
-    pub async fn find_list_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<T>>
-    where
-        T: Serialize + for<'a> Deserialize<'a>,
-    {
-        self.inner.find_list_by_query(query).await
+    pub async fn find_list_by_query(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<RdbcOrmRow>> {
+        self.get_conn().await?.find_list_by_query(query).await
     }
 }
 

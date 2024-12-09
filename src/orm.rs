@@ -35,7 +35,14 @@ impl RdbcOrm {
     where
         T: Serialize + for<'a> Deserialize<'a>,
     {
-        self.pool.find_list_by_query(query).await
+        let rows = self.pool.find_list_by_query(query).await?;
+        let mut new_rows = vec![];
+        for row in rows {
+            let json = serde_json::to_string(row.get_data()).unwrap_or("{}".to_string());
+            let data: T = serde_json::from_str(&json).unwrap();
+            new_rows.push(data);
+        }
+        Ok(new_rows)
     }
     pub fn execute_delete_by_wrapper(&self, delete: &RdbcDeleteWrapper) {}
     pub fn execute_ddl_by_wrapper(&self, ddl: &RdbcDdlWrapper) {}
