@@ -1,12 +1,13 @@
 mod adapter;
+mod bean;
 mod conn;
 mod ds;
 mod error;
 mod orm;
 mod pool;
-mod row;
 
 use crate::error::{OrmError, OrmErrorKind, OrmResp};
+pub use bean::*;
 pub use conn::*;
 pub use ds::PoolConfig;
 pub use ds::RdbcDataSource;

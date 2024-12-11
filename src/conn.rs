@@ -4,7 +4,8 @@ use bb8::PooledConnection;
 use bb8_oracle::OracleConnectionManager;
 use bb8_postgres::PostgresConnectionManager;
 use bb8_sqlite::RusqliteConnectionManager;
-use bmbp_rdbc_type::RdbcOrmRow;
+
+use crate::bean::RdbcOrmRow;
 use bmbp_sql::{render_query, DataBase, RdbcQueryWrapper};
 use tokio_postgres::types::ToSql;
 use tokio_postgres::NoTls;

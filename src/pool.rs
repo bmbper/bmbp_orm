@@ -1,4 +1,5 @@
 use crate::adapter::MySqlConnectionManager;
+use crate::bean::RdbcOrmRow;
 use crate::ds::{RdbcDataSource, RdbcDbType};
 use crate::error::{OrmError, OrmErrorKind, OrmResp};
 use crate::{
@@ -8,7 +9,6 @@ use bb8::Pool;
 use bb8_oracle::OracleConnectionManager;
 use bb8_postgres::PostgresConnectionManager;
 use bb8_sqlite::RusqliteConnectionManager;
-use bmbp_rdbc_type::RdbcOrmRow;
 use bmbp_sql::RdbcQueryWrapper;
 use mysql_async::Opts;
 use std::str::FromStr;
