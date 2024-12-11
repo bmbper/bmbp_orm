@@ -1,14 +1,7 @@
-use crate::adapter::MySqlConnectionManager;
-use crate::error::{OrmError, OrmErrorKind, OrmResp};
-use bb8::PooledConnection;
-use bb8_oracle::OracleConnectionManager;
-use bb8_postgres::PostgresConnectionManager;
-use bb8_sqlite::RusqliteConnectionManager;
-
 use crate::bean::RdbcOrmRow;
-use bmbp_sql::{render_query, DataBase, RdbcQueryWrapper};
-use tokio_postgres::types::ToSql;
-use tokio_postgres::NoTls;
+use crate::client::{RdbcMysqlConn, RdbcOracleConn, RdbcPostgresConn, RdbcSqliteConn};
+use crate::error::OrmResp;
+use bmbp_sql::RdbcQueryWrapper;
 
 pub enum RdbcConn<'a> {
     MySql(RdbcMysqlConn<'a>),
@@ -39,88 +32,7 @@ impl<'a> RdbcConn<'a> {
     }
 }
 
-pub struct RdbcSqliteConn<'a> {
-    pub conn: PooledConnection<'a, RusqliteConnectionManager>,
-}
-impl<'a> RdbcSqliteConn<'a> {
-    pub async fn validate(&mut self) -> OrmResp<()> {
-        Ok(())
-    }
-    pub async fn find_list_by_query(
-        &mut self,
-        query: &RdbcQueryWrapper,
-    ) -> OrmResp<Vec<RdbcOrmRow>> {
-        Ok(vec![])
-    }
-}
-pub struct RdbcMysqlConn<'a> {
-    pub conn: PooledConnection<'a, MySqlConnectionManager>,
-}
-impl<'a> RdbcMysqlConn<'a> {
-    pub async fn validate(&mut self) -> OrmResp<()> {
-        Ok(())
-    }
-    pub async fn find_list_by_query(
-        &mut self,
-        query: &RdbcQueryWrapper,
-    ) -> OrmResp<Vec<RdbcOrmRow>> {
-        Ok(vec![])
-    }
-}
-pub struct RdbcOracleConn<'a> {
-    pub conn: PooledConnection<'a, OracleConnectionManager>,
-}
-impl<'a> RdbcOracleConn<'a> {
-    pub async fn validate(&mut self) -> OrmResp<()> {
-        Ok(())
-    }
-    pub async fn find_list_by_query(
-        &mut self,
-        query: &RdbcQueryWrapper,
-    ) -> OrmResp<Vec<RdbcOrmRow>> {
-        Ok(vec![])
-    }
-}
-pub struct RdbcPostgresConn<'a> {
-    pub conn: PooledConnection<'a, PostgresConnectionManager<NoTls>>,
-}
-impl<'a> RdbcPostgresConn<'a> {
-    async fn validate(&mut self) -> OrmResp<()> {
-        Ok(())
-    }
-    async fn find_list_by_query(&mut self, query: &RdbcQueryWrapper) -> OrmResp<Vec<RdbcOrmRow>> {
-        let (sql, params) = render_query(query, DataBase::Postgres);
-        let pg_prams = params
-            .iter()
-            .map(|v| v as &(dyn ToSql + Sync))
-            .collect::<Vec<_>>();
-        let rs = self.conn.query(sql.as_str(), &pg_prams).await;
-        match rs {
-            Ok(rows) => {
-                let mut list = Vec::new();
-                for row in rows {
-                    let orm_row = RdbcOrmRow::from(row);
-                    list.push(orm_row);
-                }
-                Ok(list)
-            }
-            Err(e) => Err(OrmError {
-                kind: OrmErrorKind::SqlError,
-                msg: e.to_string(),
-            }),
-        }
-    }
-}
-
 pub trait RdbcTransConn {}
-pub struct RdbcSqliteTransConn {}
-impl RdbcTransConn for RdbcSqliteTransConn {}
-pub struct RdbcPostgresTransConn {}
-impl RdbcTransConn for RdbcPostgresTransConn {}
-pub struct RdbcMysqlTransConn {}
-impl RdbcTransConn for RdbcMysqlTransConn {}
-pub struct RdbcOracleTransConn {}
-impl RdbcTransConn for RdbcOracleTransConn {}
 
 pub struct RdbcConnInner<'a> {
     pub conn: RdbcConn<'a>,
