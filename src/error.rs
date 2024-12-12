@@ -1,6 +1,5 @@
-use bb8_oracle::oracle::DbError;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Error};
+use std::fmt::Display;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OrmError {
