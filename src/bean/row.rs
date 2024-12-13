@@ -7,7 +7,7 @@ use std::fmt::Debug;
 /// RdbcOrmRow 数据库查询结果 实现各个数据库的FromRow
 /// RdbcPage 分页返回值
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct RdbcOrmRow {
     columns: Vec<String>,
     data: HashMap<String, RdbcValue>,
@@ -34,41 +34,20 @@ impl RdbcOrmRow {
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 #[serde(default)]
-pub struct RdbcPage<T>
+pub struct PageData<T>
 where
     T: Default + Debug + Clone + Serialize + From<RdbcOrmRow>,
 {
-    page_size: usize,
-    page_num: usize,
-    total: usize,
-    data: Option<Vec<T>>,
+    pub(crate) page_size: usize,
+    pub(crate) page_num: usize,
+    pub(crate) total: usize,
+    pub(crate) data: Option<Vec<T>>,
 }
 
-impl<T> RdbcPage<T>
-where
-    T: Default + Debug + Clone + Serialize + From<RdbcOrmRow>,
-{
-    pub fn new() -> Self {
-        RdbcPage {
-            page_size: 10,
-            page_num: 1,
-            total: 0,
-            data: None,
-        }
-    }
-    pub fn new_with_page(page_size: usize, page_num: usize) -> Self {
-        RdbcPage {
-            page_size,
-            page_num,
-            total: 0,
-            data: None,
-        }
-    }
-}
+impl<T> PageData<T> where T: Default + Debug + Clone + Serialize + From<RdbcOrmRow> {}
 
-impl<T> RdbcPage<T>
+impl<T> PageData<T>
 where
     T: Default + Debug + Clone + Serialize + From<RdbcOrmRow>,
 {

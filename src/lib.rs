@@ -3,7 +3,7 @@ mod bean;
 mod client;
 mod conn;
 mod ds;
-mod error;
+pub mod error;
 mod orm;
 mod pool;
 
@@ -13,6 +13,7 @@ pub use conn::*;
 pub use ds::PoolConfig;
 pub use ds::RdbcDataSource;
 pub use ds::RdbcDbType;
+pub use error::*;
 pub use orm::RdbcOrm;
 pub use pool::RdbcPool;
 use std::sync::Arc;

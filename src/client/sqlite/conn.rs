@@ -1,5 +1,5 @@
 use crate::error::OrmResp;
-use crate::{RdbcOrmRow, RdbcTransConn};
+use crate::{PageData, RdbcOrmRow, RdbcTransConn};
 use bb8::PooledConnection;
 use bb8_sqlite::RusqliteConnectionManager;
 use bmbp_sql::RdbcQueryWrapper;
@@ -15,6 +15,14 @@ impl<'a> RdbcSqliteConn<'a> {
         query: &RdbcQueryWrapper,
     ) -> OrmResp<Vec<RdbcOrmRow>> {
         Ok(vec![])
+    }
+    pub(crate) async fn find_page_by_query(
+        &mut self,
+        query: &RdbcQueryWrapper,
+        page_num: usize,
+        page_size: usize,
+    ) -> OrmResp<PageData<RdbcOrmRow>> {
+        Ok(PageData::default())
     }
 }
 pub struct RdbcSqliteTransConn {}

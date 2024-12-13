@@ -6,7 +6,7 @@ use crate::client::{
     build_mysql_pool, build_oracle_pool, build_postgres_pool, build_sqlite_pool, RdbcMysqlPool,
     RdbcOraclePool, RdbcPostgresPool, RdbcSqlitePool,
 };
-use crate::RdbcConnInner;
+use crate::{PageData, RdbcConnInner};
 use bmbp_sql::RdbcQueryWrapper;
 use std::sync::Arc;
 
@@ -41,12 +41,25 @@ pub struct RdbcPoolInner {
     pub(crate) inner: RdbcPool,
 }
 
+impl RdbcPoolInner {}
+
 impl RdbcPoolInner {
     pub async fn get_conn(&self) -> OrmResp<RdbcConnInner> {
         self.inner.get_conn().await
     }
     pub async fn find_list_by_query(&self, query: &RdbcQueryWrapper) -> OrmResp<Vec<RdbcOrmRow>> {
         self.get_conn().await?.find_list_by_query(query).await
+    }
+    pub async fn find_page_by_query(
+        &self,
+        query: &RdbcQueryWrapper,
+        page_num: usize,
+        page_size: usize,
+    ) -> OrmResp<PageData<RdbcOrmRow>> {
+        self.get_conn()
+            .await?
+            .find_page_by_query(query, page_num, page_size)
+            .await
     }
 }
 
