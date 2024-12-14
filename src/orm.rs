@@ -71,6 +71,18 @@ impl RdbcOrm {
         }
         Ok(new_rows)
     }
+    pub async fn find_one_by_query<T>(&self, query: &RdbcQueryWrapper) -> OrmResp<Option<T>>
+    where
+        T: From<RdbcOrmRow> + Default + Debug + Clone + Serialize,
+    {
+        let row_op = self.pool.find_one_by_query(query).await?;
+        if let Some(row) = row_op {
+            let t = T::from(row);
+            Ok(Some(t))
+        } else {
+            Ok(None)
+        }
+    }
     pub fn execute_delete_by_wrapper(&self, delete: &RdbcDeleteWrapper) {}
     pub fn execute_ddl_by_wrapper(&self, ddl: &RdbcDdlWrapper) {}
 }

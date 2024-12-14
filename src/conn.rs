@@ -44,6 +44,17 @@ impl<'a> RdbcConn<'a> {
             RdbcConn::Sqlite(c) => c.find_page_by_query(query, page_num, page_size).await,
         }
     }
+    pub(crate) async fn find_one_by_query(
+        &mut self,
+        query: &RdbcQueryWrapper,
+    ) -> OrmResp<Option<RdbcOrmRow>> {
+        match self {
+            RdbcConn::MySql(c) => c.find_one_by_query(query).await,
+            RdbcConn::Oracle(c) => c.find_one_by_query(query).await,
+            RdbcConn::Postgres(c) => c.find_one_by_query(query).await,
+            RdbcConn::Sqlite(c) => c.find_one_by_query(query).await,
+        }
+    }
 }
 
 pub trait RdbcTransConn {}
@@ -71,6 +82,12 @@ impl<'a> RdbcConnInner<'a> {
         self.conn
             .find_page_by_query(query, page_num, page_size)
             .await
+    }
+    pub(crate) async fn find_one_by_query(
+        &mut self,
+        query: &RdbcQueryWrapper,
+    ) -> OrmResp<Option<RdbcOrmRow>> {
+        self.conn.find_one_by_query(query).await
     }
 }
 

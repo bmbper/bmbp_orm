@@ -61,6 +61,12 @@ impl RdbcPoolInner {
             .find_page_by_query(query, page_num, page_size)
             .await
     }
+    pub(crate) async fn find_one_by_query(
+        &self,
+        query: &RdbcQueryWrapper,
+    ) -> OrmResp<Option<RdbcOrmRow>> {
+        self.get_conn().await?.find_one_by_query(query).await
+    }
 }
 
 impl RdbcPoolInner {

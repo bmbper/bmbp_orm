@@ -79,6 +79,17 @@ impl<'a> RdbcPostgresConn<'a> {
             .collect::<Vec<_>>();
         self.find_list_by_raw_sql_pg_params(&sql, &pg_prams).await
     }
+    pub(crate) async fn find_one_by_query(
+        &mut self,
+        query: &RdbcQueryWrapper,
+    ) -> OrmResp<Option<RdbcOrmRow>> {
+        let (sql, params) = render_query(query, DataBase::Postgres);
+        let pg_prams = params
+            .iter()
+            .map(|v| v as &(dyn ToSql + Sync))
+            .collect::<Vec<_>>();
+        self.find_one_by_raw_sql_pg_params(&sql, &pg_prams).await
+    }
 
     pub(crate) async fn find_count_by_query(&mut self, query: &RdbcQueryWrapper) -> OrmResp<usize> {
         let (sql, params) = render_query(query, DataBase::Postgres);

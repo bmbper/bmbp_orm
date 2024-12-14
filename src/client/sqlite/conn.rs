@@ -24,6 +24,12 @@ impl<'a> RdbcSqliteConn<'a> {
     ) -> OrmResp<PageData<RdbcOrmRow>> {
         Ok(PageData::default())
     }
+    pub(crate) async fn find_one_by_query(
+        &mut self,
+        query: &RdbcQueryWrapper,
+    ) -> OrmResp<Option<RdbcOrmRow>> {
+        Ok(None)
+    }
 }
 pub struct RdbcSqliteTransConn {}
 impl RdbcTransConn for RdbcSqliteTransConn {}
