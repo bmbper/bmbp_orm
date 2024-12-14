@@ -1,10 +1,10 @@
 use crate::error::{OrmError, OrmErrorKind, OrmResp};
-use crate::{PageData, RdbcOrmRow, RdbcTransConn};
+use crate::{PageData, RdbcConnInner, RdbcOrmRow, RdbcTransConn};
 use bb8::PooledConnection;
 use bb8_postgres::PostgresConnectionManager;
 use bmbp_sql::{render_query, DataBase, RdbcQueryWrapper};
 use tokio_postgres::types::ToSql;
-use tokio_postgres::{Error, NoTls, Row};
+use tokio_postgres::{Error, NoTls, Row, Transaction};
 
 pub struct RdbcPostgresConn<'a> {
     pub conn: PooledConnection<'a, PostgresConnectionManager<NoTls>>,
@@ -171,5 +171,14 @@ impl<'a> RdbcPostgresConn<'a> {
         }
     }
 }
-pub struct RdbcPostgresTransConn {}
-impl RdbcTransConn for RdbcPostgresTransConn {}
+
+impl<'a> RdbcPostgresConn<'a> {
+    pub async fn get_transaction(&mut self) -> RdbcPostgresTransConn {
+        let trans = self.conn.transaction().await.unwrap();
+        RdbcPostgresTransConn { transaction: trans }
+    }
+}
+pub struct RdbcPostgresTransConn<'a> {
+    transaction: Transaction<'a>,
+}
+impl<'a> RdbcTransConn for RdbcPostgresTransConn<'a> {}
