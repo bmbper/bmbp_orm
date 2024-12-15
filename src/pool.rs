@@ -1,36 +1,30 @@
 use crate::bean::RdbcOrmRow;
 use crate::ds::{RdbcDataSource, RdbcDbType};
-use crate::error::OrmResp;
+use crate::error::{OrmError, OrmErrorKind, OrmResp};
 
-use crate::client::{
-    build_mysql_pool, build_oracle_pool, build_postgres_pool, build_sqlite_pool, RdbcMysqlPool,
-    RdbcOraclePool, RdbcPostgresPool, RdbcSqlitePool,
-};
-use crate::{PageData, RdbcConn, RdbcTransaction};
+use crate::client::{build_postgres_pool, RdbcPostgresPool};
+use crate::{PageData, RdbcConn};
 use bmbp_sql::RdbcQueryWrapper;
 use std::sync::Arc;
 
 pub enum RdbcPool {
-    Sqlite(RdbcSqlitePool),
-    Oracle(RdbcOraclePool),
-    Mysql(RdbcMysqlPool),
     Postgres(RdbcPostgresPool),
 }
 
 impl RdbcPool {
     pub async fn new(datasource: Arc<RdbcDataSource>) -> OrmResp<RdbcPool> {
         match datasource.db_type {
-            RdbcDbType::Mysql => build_mysql_pool(datasource.clone()).await,
-            RdbcDbType::Oracle => build_oracle_pool(datasource.clone()).await,
             RdbcDbType::Postgres => build_postgres_pool(datasource.clone()).await,
-            RdbcDbType::Sqlite => build_sqlite_pool(datasource.clone()).await,
+            _ => {
+                return Err(OrmError {
+                    kind: OrmErrorKind::NotSupport,
+                    msg: "不支持的数据库类型".to_string(),
+                });
+            }
         }
     }
     pub async fn get_conn(&self) -> OrmResp<RdbcConn> {
         match self {
-            RdbcPool::Sqlite(p) => p.get_conn().await,
-            RdbcPool::Oracle(p) => p.get_conn().await,
-            RdbcPool::Mysql(p) => p.get_conn().await,
             RdbcPool::Postgres(p) => p.get_conn().await,
         }
     }

@@ -1,7 +1,8 @@
 use bb8::RunError;
+use bb8_oracle;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use tokio_postgres::Error;
+use tokio_postgres;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OrmError {
@@ -42,16 +43,41 @@ impl Display for OrmErrorKind {
 pub type OrmResp<T> = Result<T, OrmError>;
 
 impl From<tokio_postgres::Error> for OrmError {
-    fn from(value: Error) -> Self {
+    fn from(value: tokio_postgres::Error) -> Self {
         OrmError {
             kind: OrmErrorKind::SqlError,
             msg: value.to_string(),
         }
     }
 }
-
 impl From<RunError<tokio_postgres::Error>> for OrmError {
-    fn from(value: RunError<Error>) -> Self {
+    fn from(value: RunError<tokio_postgres::Error>) -> Self {
+        OrmError {
+            kind: OrmErrorKind::PoolError,
+            msg: value.to_string(),
+        }
+    }
+}
+
+impl From<bb8_oracle::oracle::Error> for OrmError {
+    fn from(value: bb8_oracle::oracle::Error) -> Self {
+        OrmError {
+            kind: OrmErrorKind::PoolError,
+            msg: value.to_string(),
+        }
+    }
+}
+impl From<bb8_oracle::Error> for OrmError {
+    fn from(value: bb8_oracle::Error) -> Self {
+        OrmError {
+            kind: OrmErrorKind::PoolError,
+            msg: value.to_string(),
+        }
+    }
+}
+
+impl From<rusqlite::Error> for OrmError {
+    fn from(value: rusqlite::Error) -> Self {
         OrmError {
             kind: OrmErrorKind::PoolError,
             msg: value.to_string(),

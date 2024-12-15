@@ -15,7 +15,7 @@ impl<'a> RdbcPostgresConn<'a> {
     }
     pub async fn get_transaction(&mut self) -> OrmResp<RdbcTransaction> {
         let trans = self.conn.transaction().await?;
-        let conn = RdbcPostgresTransaction { trans };
+        let conn = RdbcPostgresTransaction { trans: Some(trans) };
         Ok(RdbcTransaction::Postgres(conn))
     }
     pub(crate) async fn find_page_by_query(
@@ -178,5 +178,30 @@ impl<'a> RdbcPostgresConn<'a> {
 }
 
 pub struct RdbcPostgresTransaction<'a> {
-    pub trans: Transaction<'a>,
+    pub trans: Option<Transaction<'a>>,
+}
+impl<'a> RdbcPostgresTransaction<'a> {
+    pub async fn commit(&mut self) -> OrmResp<()> {
+        if let Some(trans) = self.trans.take() {
+            trans.commit().await?;
+            Ok(())
+        } else {
+            Err(OrmError {
+                kind: OrmErrorKind::SqlError,
+                msg: "Transaction already completed.".to_string(),
+            })
+        }
+    }
+
+    pub async fn rollback(&mut self) -> OrmResp<()> {
+        if let Some(trans) = self.trans.take() {
+            trans.rollback().await?;
+            Ok(())
+        } else {
+            Err(OrmError {
+                kind: OrmErrorKind::SqlError,
+                msg: "Transaction already completed.".to_string(),
+            })
+        }
+    }
 }

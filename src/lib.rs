@@ -1,4 +1,3 @@
-mod adapter;
 mod bean;
 mod client;
 mod conn;
