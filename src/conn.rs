@@ -82,3 +82,14 @@ pub enum RdbcTransaction<'a> {
     Postgres(RdbcPostgresTransaction<'a>),
     Sqlite(RdbcSqliteTransaction<'a>),
 }
+
+impl<'a> RdbcTransaction<'a> {
+    pub async fn commit(&self) {
+        match self {
+            RdbcTransaction::MySql(c) => c.commit().await,
+            RdbcTransaction::Oracle(c) => c.commit().await,
+            RdbcTransaction::Postgres(c) => c.commit().await,
+            RdbcTransaction::Sqlite(c) => c.commit().await,
+        }
+    }
+}
