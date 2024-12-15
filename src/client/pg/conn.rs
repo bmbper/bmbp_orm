@@ -2,7 +2,10 @@ use crate::error::{OrmError, OrmErrorKind, OrmResp};
 use crate::{PageData, RdbcOrmRow, RdbcTransaction};
 use bb8::PooledConnection;
 use bb8_postgres::PostgresConnectionManager;
-use bmbp_sql::{render_query, DataBase, RdbcQueryWrapper};
+use bmbp_sql::{
+    render_delete, render_insert, render_query, render_update, DataBase, RdbcDeleteWrapper,
+    RdbcInsertWrapper, RdbcQueryWrapper, RdbcUpdateWrapper, RdbcValue,
+};
 use tokio_postgres::types::ToSql;
 use tokio_postgres::{NoTls, Transaction};
 
@@ -174,6 +177,40 @@ impl<'a> RdbcPostgresConn<'a> {
                 msg: "查询总数失败: 未查询到统计记录".to_string(),
             });
         }
+    }
+    pub(crate) async fn execute_insert_by_wrapper(
+        &mut self,
+        insert: &RdbcInsertWrapper,
+    ) -> OrmResp<usize> {
+        let (sql, params) = render_insert(insert, DataBase::Postgres);
+        self.execute_sql_params(&sql, &params).await
+    }
+    pub(crate) async fn execute_update_by_wrapper(
+        &mut self,
+        update: &RdbcUpdateWrapper,
+    ) -> OrmResp<usize> {
+        let (sql, params) = render_update(update, DataBase::Postgres);
+        self.execute_sql_params(&sql, &params).await
+    }
+    pub(crate) async fn execute_delete_by_wrapper(
+        &mut self,
+        delete: &RdbcDeleteWrapper,
+    ) -> OrmResp<usize> {
+        let (sql, params) = render_delete(delete, DataBase::Postgres);
+        self.execute_sql_params(&sql, &params).await
+    }
+
+    pub(crate) async fn execute_sql_params(
+        &mut self,
+        sql: &String,
+        params: &Vec<RdbcValue>,
+    ) -> OrmResp<usize> {
+        let pg_prams = params
+            .iter()
+            .map(|v| v as &(dyn ToSql + Sync))
+            .collect::<Vec<_>>();
+        let row_count = self.conn.execute(sql, &pg_prams).await?;
+        Ok(row_count as usize)
     }
 }
 

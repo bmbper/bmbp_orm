@@ -2,7 +2,7 @@ use crate::bean::RdbcOrmRow;
 use crate::client::{RdbcPostgresConn, RdbcPostgresTransaction};
 use crate::error::OrmResp;
 use crate::PageData;
-use bmbp_sql::RdbcQueryWrapper;
+use bmbp_sql::{RdbcDeleteWrapper, RdbcInsertWrapper, RdbcQueryWrapper, RdbcUpdateWrapper};
 
 pub enum RdbcConn<'a> {
     Postgres(RdbcPostgresConn<'a>),
@@ -43,6 +43,30 @@ impl<'a> RdbcConn<'a> {
     ) -> OrmResp<Option<RdbcOrmRow>> {
         match self {
             RdbcConn::Postgres(c) => c.find_one_by_query(query).await,
+        }
+    }
+    pub(crate) async fn execute_insert_by_wrapper(
+        &mut self,
+        insert: &RdbcInsertWrapper,
+    ) -> OrmResp<usize> {
+        match self {
+            RdbcConn::Postgres(c) => c.execute_insert_by_wrapper(insert).await,
+        }
+    }
+    pub(crate) async fn execute_update_by_wrapper(
+        &mut self,
+        update: &RdbcUpdateWrapper,
+    ) -> OrmResp<usize> {
+        match self {
+            RdbcConn::Postgres(c) => c.execute_update_by_wrapper(update).await,
+        }
+    }
+    pub(crate) async fn execute_delete_by_wrapper(
+        &mut self,
+        delete: &RdbcDeleteWrapper,
+    ) -> OrmResp<usize> {
+        match self {
+            RdbcConn::Postgres(c) => c.execute_delete_by_wrapper(delete).await,
         }
     }
 }

@@ -4,7 +4,7 @@ use crate::error::{OrmError, OrmErrorKind, OrmResp};
 
 use crate::client::{build_postgres_pool, RdbcPostgresPool};
 use crate::{PageData, RdbcConn};
-use bmbp_sql::RdbcQueryWrapper;
+use bmbp_sql::{RdbcDeleteWrapper, RdbcInsertWrapper, RdbcQueryWrapper, RdbcUpdateWrapper};
 use std::sync::Arc;
 
 pub enum RdbcPool {
@@ -48,5 +48,33 @@ impl RdbcPool {
         query: &RdbcQueryWrapper,
     ) -> OrmResp<Option<RdbcOrmRow>> {
         self.get_conn().await?.find_one_by_query(query).await
+    }
+
+    pub(crate) async fn execute_insert_by_wrapper(
+        &self,
+        insert: &RdbcInsertWrapper,
+    ) -> OrmResp<usize> {
+        self.get_conn()
+            .await?
+            .execute_insert_by_wrapper(insert)
+            .await
+    }
+    pub(crate) async fn execute_update_by_wrapper(
+        &self,
+        update: &RdbcUpdateWrapper,
+    ) -> OrmResp<usize> {
+        self.get_conn()
+            .await?
+            .execute_update_by_wrapper(update)
+            .await
+    }
+    pub(crate) async fn execute_delete_by_wrapper(
+        &self,
+        update: &RdbcDeleteWrapper,
+    ) -> OrmResp<usize> {
+        self.get_conn()
+            .await?
+            .execute_delete_by_wrapper(update)
+            .await
     }
 }

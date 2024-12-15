@@ -1,7 +1,10 @@
 use crate::ds::RdbcDataSource;
 use crate::error::OrmResp;
 use crate::{PageData, RdbcConn, RdbcOrmRow, RdbcPool, RdbcTransaction};
-use bmbp_sql::{RdbcDdlWrapper, RdbcDeleteWrapper, RdbcQueryWrapper, RdbcValue};
+use bmbp_sql::{
+    RdbcDdlWrapper, RdbcDeleteWrapper, RdbcInsertWrapper, RdbcQueryWrapper, RdbcUpdateWrapper,
+    RdbcValue,
+};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -20,13 +23,11 @@ impl RdbcOrm {
             datasource: datasource.clone(),
         })
     }
-}
-
-impl RdbcOrm {
     pub async fn get_conn(&self) -> OrmResp<RdbcConn> {
         self.pool.get_conn().await
     }
 }
+
 impl RdbcOrm {
     pub async fn find_page_by_query<T>(
         &self,
@@ -81,7 +82,15 @@ impl RdbcOrm {
             Ok(None)
         }
     }
-    pub fn execute_delete_by_wrapper(&self, delete: &RdbcDeleteWrapper) {}
+    pub async fn execute_insert_by_wrapper(&self, insert: &RdbcInsertWrapper) -> OrmResp<usize> {
+        self.pool.execute_insert_by_wrapper(insert).await
+    }
+    pub async fn execute_update_by_wrapper(&self, update: &RdbcUpdateWrapper) -> OrmResp<usize> {
+        self.pool.execute_update_by_wrapper(update).await
+    }
+    pub async fn execute_delete_by_wrapper(&self, delete: &RdbcDeleteWrapper) -> OrmResp<usize> {
+        self.pool.execute_delete_by_wrapper(delete).await
+    }
     pub fn execute_ddl_by_wrapper(&self, ddl: &RdbcDdlWrapper) {}
 }
 
