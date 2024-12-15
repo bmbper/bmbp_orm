@@ -1,8 +1,10 @@
 use crate::error::OrmResp;
-use crate::{PageData, RdbcOrmRow, RdbcTransConn};
+use crate::{PageData, RdbcOrmRow};
 use bb8::PooledConnection;
 use bb8_sqlite::RusqliteConnectionManager;
 use bmbp_sql::RdbcQueryWrapper;
+use rusqlite::Transaction;
+
 pub struct RdbcSqliteConn<'a> {
     pub conn: PooledConnection<'a, RusqliteConnectionManager>,
 }
@@ -31,5 +33,6 @@ impl<'a> RdbcSqliteConn<'a> {
         Ok(None)
     }
 }
-pub struct RdbcSqliteTransConn {}
-impl RdbcTransConn for RdbcSqliteTransConn {}
+pub struct RdbcSqliteTransaction<'a> {
+    transaction: Transaction<'a>,
+}

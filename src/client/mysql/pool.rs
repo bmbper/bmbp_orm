@@ -1,25 +1,23 @@
 use crate::adapter::MySqlConnectionManager;
 use crate::client::mysql::RdbcMysqlConn;
 use crate::error::{OrmError, OrmErrorKind, OrmResp};
-use crate::pool::RdbcPoolInner;
-use crate::{RdbcConn, RdbcConnInner, RdbcDataSource, RdbcOrmRow, RdbcPool};
+use crate::{RdbcConn, RdbcDataSource, RdbcOrmRow, RdbcPool, RdbcTransaction};
 use bb8::Pool;
 use bmbp_sql::RdbcQueryWrapper;
 use mysql_async::Opts;
 use std::sync::Arc;
 
 pub struct RdbcMysqlPool {
+    datasource: Arc<RdbcDataSource>,
     pool: Pool<MySqlConnectionManager>,
 }
 impl RdbcMysqlPool {
-    pub(crate) async fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+    pub(crate) async fn get_conn(&self) -> OrmResp<RdbcConn> {
         let conn_rs = self.pool.get().await;
         match conn_rs {
             Ok(conn) => {
                 let mysql_conn = RdbcMysqlConn { conn };
-                Ok(RdbcConnInner {
-                    conn: RdbcConn::MySql(mysql_conn),
-                })
+                Ok(RdbcConn::MySql(mysql_conn))
             }
             Err(err) => Err(OrmError {
                 kind: OrmErrorKind::PoolError,
@@ -32,7 +30,7 @@ impl RdbcMysqlPool {
         self.get_conn().await?.find_list_by_query(query).await
     }
 }
-pub async fn build_mysql_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> {
+pub async fn build_mysql_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPool> {
     let opts = mysql_async::OptsBuilder::default()
         .ip_or_hostname(data_source.host.clone())
         .db_name(Some(data_source.db_name.clone()))
@@ -45,10 +43,10 @@ pub async fn build_mysql_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcP
         .build(manager)
         .await;
     match pool_rs {
-        Ok(pool) => Ok(RdbcPoolInner {
-            datasource: data_source,
-            inner: RdbcPool::Mysql(RdbcMysqlPool { pool }),
-        }),
+        Ok(pool) => Ok(RdbcPool::Mysql(RdbcMysqlPool {
+            pool,
+            datasource: data_source.clone(),
+        })),
         Err(err) => Err(OrmError {
             kind: OrmErrorKind::ConnError,
             msg: err.to_string(),

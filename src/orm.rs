@@ -1,21 +1,20 @@
 use crate::ds::RdbcDataSource;
 use crate::error::OrmResp;
-use crate::pool::RdbcPoolInner;
-use crate::{PageData, RdbcConnInner, RdbcOrmRow};
+use crate::{PageData, RdbcConn, RdbcOrmRow, RdbcPool, RdbcTransaction};
 use bmbp_sql::{RdbcDdlWrapper, RdbcDeleteWrapper, RdbcQueryWrapper, RdbcValue};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
 pub struct RdbcOrm {
-    pool: RdbcPoolInner,
+    pool: RdbcPool,
     datasource: Arc<RdbcDataSource>,
 }
 
 impl RdbcOrm {
     pub async fn new(datasource: Arc<RdbcDataSource>) -> OrmResp<Self> {
-        let pool = RdbcPoolInner::new(datasource.clone()).await?;
+        let pool = RdbcPool::new(datasource.clone()).await?;
         Ok(RdbcOrm {
             pool,
             datasource: datasource.clone(),
@@ -24,10 +23,9 @@ impl RdbcOrm {
 }
 
 impl RdbcOrm {
-    pub async fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+    pub async fn get_conn(&self) -> OrmResp<RdbcConn> {
         self.pool.get_conn().await
     }
-    pub async fn get_trans_conn(&self) {}
 }
 impl RdbcOrm {
     pub async fn find_page_by_query<T>(

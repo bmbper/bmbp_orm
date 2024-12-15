@@ -1,8 +1,9 @@
 use crate::error::OrmResp;
-use crate::{PageData, RdbcOrmRow, RdbcTransConn};
+use crate::{PageData, RdbcOrmRow};
 use bb8::PooledConnection;
 use bb8_oracle::OracleConnectionManager;
 use bmbp_sql::RdbcQueryWrapper;
+
 pub struct RdbcOracleConn<'a> {
     pub conn: PooledConnection<'a, OracleConnectionManager>,
 }
@@ -10,6 +11,7 @@ impl<'a> RdbcOracleConn<'a> {
     pub async fn validate(&mut self) -> OrmResp<()> {
         Ok(())
     }
+
     pub async fn find_list_by_query(
         &mut self,
         query: &RdbcQueryWrapper,
@@ -31,5 +33,6 @@ impl<'a> RdbcOracleConn<'a> {
         Ok(None)
     }
 }
-pub struct RdbcOracleTransConn {}
-impl RdbcTransConn for RdbcOracleTransConn {}
+pub struct RdbcOracleTransaction<'a> {
+    transaction: RdbcOracleConn<'a>,
+}

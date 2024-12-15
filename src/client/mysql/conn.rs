@@ -1,8 +1,9 @@
 use crate::adapter::MySqlConnectionManager;
 use crate::error::OrmResp;
-use crate::{PageData, RdbcOrmRow, RdbcTransConn};
+use crate::{PageData, RdbcOrmRow, RdbcTransaction};
 use bb8::PooledConnection;
 use bmbp_sql::RdbcQueryWrapper;
+use mysql_async::Transaction;
 
 pub struct RdbcMysqlConn<'a> {
     pub conn: PooledConnection<'a, MySqlConnectionManager>,
@@ -33,5 +34,6 @@ impl<'a> RdbcMysqlConn<'a> {
     }
 }
 
-pub struct RdbcMysqlTransConn {}
-impl RdbcTransConn for RdbcMysqlTransConn {}
+pub struct RdbcMysqlTransaction<'a> {
+    transaction: Transaction<'a>,
+}

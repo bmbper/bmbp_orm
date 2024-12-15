@@ -1,24 +1,22 @@
 use crate::client::oracle::RdbcOracleConn;
 use crate::error::{OrmError, OrmErrorKind, OrmResp};
-use crate::pool::RdbcPoolInner;
-use crate::{RdbcConn, RdbcConnInner, RdbcDataSource, RdbcPool};
+use crate::{RdbcConn, RdbcDataSource, RdbcPool, RdbcTransaction};
 use bb8::Pool;
 use bb8_oracle::OracleConnectionManager;
 use std::sync::Arc;
 
 pub struct RdbcOraclePool {
+    datasource: Arc<RdbcDataSource>,
     pool: Pool<OracleConnectionManager>,
 }
 
 impl RdbcOraclePool {
-    pub(crate) async fn get_conn(&self) -> OrmResp<RdbcConnInner> {
+    pub(crate) async fn get_conn(&self) -> OrmResp<RdbcConn> {
         let conn_rs = self.pool.get().await;
         match conn_rs {
             Ok(conn) => {
                 let conn = RdbcOracleConn { conn };
-                Ok(RdbcConnInner {
-                    conn: RdbcConn::Oracle(conn),
-                })
+                Ok(RdbcConn::Oracle(conn))
             }
             Err(err) => Err(OrmError {
                 kind: OrmErrorKind::PoolError,
@@ -27,7 +25,7 @@ impl RdbcOraclePool {
         }
     }
 }
-pub async fn build_oracle_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPoolInner> {
+pub async fn build_oracle_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<RdbcPool> {
     let manager = OracleConnectionManager::new(
         data_source.user.as_str(),
         data_source.password.as_str(),
@@ -38,10 +36,10 @@ pub async fn build_oracle_pool(data_source: Arc<RdbcDataSource>) -> OrmResp<Rdbc
         .build(manager)
         .await;
     match pool_rs {
-        Ok(pool) => Ok(RdbcPoolInner {
-            datasource: data_source,
-            inner: RdbcPool::Oracle(RdbcOraclePool { pool }),
-        }),
+        Ok(pool) => Ok(RdbcPool::Oracle(RdbcOraclePool {
+            pool,
+            datasource: data_source.clone(),
+        })),
         Err(err) => Err(OrmError {
             kind: OrmErrorKind::ConnError,
             msg: err.to_string(),

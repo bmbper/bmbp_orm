@@ -1,10 +1,10 @@
 use crate::error::{OrmError, OrmErrorKind, OrmResp};
-use crate::{PageData, RdbcConnInner, RdbcOrmRow, RdbcTransConn};
+use crate::{PageData, RdbcOrmRow, RdbcTransaction};
 use bb8::PooledConnection;
 use bb8_postgres::PostgresConnectionManager;
 use bmbp_sql::{render_query, DataBase, RdbcQueryWrapper};
 use tokio_postgres::types::ToSql;
-use tokio_postgres::{Error, NoTls, Row, Transaction};
+use tokio_postgres::{NoTls, Transaction};
 
 pub struct RdbcPostgresConn<'a> {
     pub conn: PooledConnection<'a, PostgresConnectionManager<NoTls>>,
@@ -12,6 +12,11 @@ pub struct RdbcPostgresConn<'a> {
 impl<'a> RdbcPostgresConn<'a> {
     pub(crate) async fn validate(&mut self) -> OrmResp<()> {
         Ok(())
+    }
+    pub async fn get_transaction(&mut self) -> OrmResp<RdbcTransaction> {
+        let trans = self.conn.transaction().await?;
+        let conn = RdbcPostgresTransaction { trans };
+        Ok(RdbcTransaction::Postgres(conn))
     }
     pub(crate) async fn find_page_by_query(
         &mut self,
@@ -172,13 +177,6 @@ impl<'a> RdbcPostgresConn<'a> {
     }
 }
 
-impl<'a> RdbcPostgresConn<'a> {
-    pub async fn get_transaction(&mut self) -> RdbcPostgresTransConn {
-        let trans = self.conn.transaction().await.unwrap();
-        RdbcPostgresTransConn { transaction: trans }
-    }
+pub struct RdbcPostgresTransaction<'a> {
+    pub trans: Transaction<'a>,
 }
-pub struct RdbcPostgresTransConn<'a> {
-    transaction: Transaction<'a>,
-}
-impl<'a> RdbcTransConn for RdbcPostgresTransConn<'a> {}
