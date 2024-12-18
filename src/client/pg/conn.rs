@@ -157,7 +157,6 @@ impl<'a> RdbcPostgresConn<'a> {
         if let Some(total_row) = self.find_one_by_raw_sql_pg_params(&sql, &params).await? {
             if let Some(total_value) = total_row.get_data().get("count") {
                 if let Some(total_value) = total_value.as_number() {
-                    println!("====>{}", total_value);
                     Ok(total_value as usize)
                 } else {
                     return Err(OrmError {
